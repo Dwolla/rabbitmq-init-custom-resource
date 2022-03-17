@@ -24,9 +24,9 @@ object ServerlessDeployPlugin extends AutoPlugin {
 
       val baseCommand = serverlessDeployCommand.value
       val exitCode = Process(
-        baseCommand ++ Seq("--stage", Stage.parser.parsed.name),
+        baseCommand ++ Seq("--stage", Stage.parser.parsed.name.toLowerCase),
         Option((ThisBuild / baseDirectory).value),
-        "DATABASE_ARTIFACT_PATH" -> (Universal / packageBin).value.toString,
+        "ARTIFACT_PATH" -> (Universal / packageBin).value.toString,
       ).!
 
       if (exitCode == 0) exitCode
