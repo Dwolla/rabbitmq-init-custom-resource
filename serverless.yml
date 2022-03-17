@@ -1,0 +1,74 @@
+service: rabbitmq-init-custom-resource
+useDotenv: true
+frameworkVersion: ^3.11.0
+
+provider:
+  name: aws
+  runtime: java11
+  memorySize: 1024
+  timeout: 60
+  region: us-west-2
+  deploymentBucket:
+    name: ${env:BUCKET}
+    serverSideEncryption: "AES256"
+  logRetentionInDays: 7
+  iam:
+    deploymentRole: "arn:aws:iam::${env:ACCOUNT}:role/cloudformation/deployer/cloudformation-deployer"
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetResourcePolicy
+            - secretsmanager:GetSecretValue
+            - secretsmanager:DescribeSecret
+            - secretsmanager:ListSecretVersionIds
+            - secretsmanager:ListSecret
+          Resource:
+            - Fn::Sub: "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:rabbitmq/${opt:stage}/rabbitmq/*"
+  stackTags:
+    Creator: serverless
+    Environment: ${opt:stage}
+    Project: ${self:service}
+    Team: platform
+    Visibility: internal
+  vpc:
+    subnetIds:
+      - ${env:SUBNET_ID}
+    securityGroupIds:
+      - !GetAtt LambdaSg.GroupId
+
+functions:
+  InitRabbitMqUser:
+    handler: com.dwolla.rabbitmq.users.Handler
+    package:
+      artifact: ${env:ARTIFACT_PATH}
+
+package:
+  individually: true
+
+resources:
+  Description: "CloudFormation custom resources for initializing RabbitMQ users and policies"
+  Outputs:
+    InitRabbitMqUserFunction:
+      Description: Database initialization Lambda Function Service Token
+      Value:
+        'Fn::GetAtt': [InitRabbitMqUserLambdaFunction, Arn]
+      Export:
+        Name: ${self:service}:${opt:stage}:InitMySqlDatabaseArn
+  Resources:
+    LambdaSg:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Traffic source security group for ${opt:stage} rabbitmq-init-custom-resource
+        VpcId:
+          Fn::ImportValue: ${self:custom.VpcIdExport.${opt:stage}}
+        Tags:
+          - Key: SecurityGroupType
+            Value: TrafficSource
+
+custom:
+  VpcIdExport:
+    sandbox: SandboxVpcId
+    devint: DevIntVpcId
+    uat: UatVpcId
+    prod: ProdVpcId
