@@ -1,6 +1,8 @@
-package com.dwolla.rabbitmq.users
+package com.dwolla.rabbitmq
+package users
 
 import com.dwolla.DwollaEnvironment
+import com.dwolla.rabbitmq.RabbitMqCommonHandler.UriFromHost
 import io.circe.Codec
 import io.circe.generic.semiauto.deriveCodec
 
@@ -19,7 +21,7 @@ case class UserDeletionException(username: String) extends RuntimeException(s"Fa
 case class RabbitMqUser(username: String,
                         password: String,
                         permissions: RabbitMqPermissions,
-                        host: String,
+                        host: UriFromHost,
                         environment: DwollaEnvironment,
                        )
 

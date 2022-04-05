@@ -7,7 +7,7 @@ import cats.effect.std.Random
 import cats.effect.syntax.all._
 import cats.syntax.all._
 import cats.tagless.syntax.all._
-import com.dwolla.RabbitMqCommonHandler._
+import com.dwolla.rabbitmq.RabbitMqCommonHandler._
 import com.dwolla.aws.SecretsManagerAlg
 import com.dwolla.rabbitmq.policies.RabbitMqPoliciesResource.handleRequest
 import com.dwolla.tracing._
@@ -54,9 +54,8 @@ object RabbitMqPoliciesResource {
       
       private def createOrUpdate(input: RabbitMqPolicy): F[HandlerResponse[INothing]] =
         for {
-          baseUri <- baseUri[F](input.host)
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
-          id <- putPolicy(input.policyName, input.policy, policyUri(baseUri, input.policyName), auth)
+          id <- putPolicy(input.policyName, input.policy, policyUri(input.host.value, input.policyName), auth)
         } yield HandlerResponse(id, None)
 
       override def createResource(input: RabbitMqPolicy): F[HandlerResponse[INothing]] =
@@ -67,9 +66,8 @@ object RabbitMqPoliciesResource {
 
       override def deleteResource(input: RabbitMqPolicy): F[HandlerResponse[INothing]] =
         for {
-          baseUri <- baseUri[F](input.host)
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
-          uri = policyUri(baseUri, input.policyName)
+          uri = policyUri(input.host.value, input.policyName)
           physicalId <- PhysicalResourceId(uri.renderString).liftTo[F](PolicyRemovalException(uri))
           _ <- client.successful(DELETE(uri, auth)).ifM(().pure[F], PolicyRemovalException(uri).raiseError)
         } yield HandlerResponse(physicalId, None)

@@ -7,7 +7,7 @@ import cats.effect.std.Random
 import cats.effect.syntax.all._
 import cats.syntax.all._
 import cats.tagless.syntax.all._
-import com.dwolla.RabbitMqCommonHandler.{baseUri, rabbitAuthorizationHeader}
+import com.dwolla.rabbitmq.RabbitMqCommonHandler._
 import com.dwolla.aws.SecretsManagerAlg
 import com.dwolla.rabbitmq.users.RabbitMqUserResource.handleRequest
 import com.dwolla.tracing._
@@ -61,10 +61,9 @@ object RabbitMqUserResource {
 
       private def createOrUpdate(input: RabbitMqUser): F[HandlerResponse[INothing]] =
         for {
-          baseUri <- baseUri(input.host)
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
-          id <- putUser(input, baseUri / "api" / "users" / input.username, auth)
-          _ <- putUserPermissions(input, baseUri, auth)
+          id <- putUser(input, input.host.value / "api" / "users" / input.username, auth)
+          _ <- putUserPermissions(input, input.host.value, auth)
         } yield HandlerResponse(id, None)
 
       override def createResource(input: RabbitMqUser): F[HandlerResponse[INothing]] =
@@ -75,9 +74,8 @@ object RabbitMqUserResource {
 
       override def deleteResource(input: RabbitMqUser): F[HandlerResponse[INothing]] =
         for {
-          baseUri <- baseUri(input.host)
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
-          id <- deleteUser(input, baseUri / "api" / "users" / input.username, auth)
+          id <- deleteUser(input, input.host.value / "api" / "users" / input.username, auth)
         } yield HandlerResponse(id, None)
 
       private def deleteUser(input: RabbitMqUser, userUri: Uri, auth: Authorization): F[PhysicalResourceId] =

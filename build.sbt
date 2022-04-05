@@ -34,7 +34,7 @@ lazy val `rabbitmq-init-custom-resource` = (project in file("."))
       val scalacheckEffectVersion = "1.0.3"
       val log4catsVersion = "2.2.0"
       val monocleVersion = "2.1.0"
-      val http4sVersion = "0.23.10"
+      val http4sVersion = "0.23.11"
       val awsSdkVersion = "2.17.143"
       val refinedV = "0.9.28"
 
@@ -66,6 +66,8 @@ lazy val `rabbitmq-init-custom-resource` = (project in file("."))
         "com.github.julien-truffaut" %% "monocle-core" % monocleVersion % Test,
         "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion % Test,
         "org.http4s" %% "http4s-dsl" % http4sVersion % Test,
+        "org.http4s" %% "http4s-laws" % http4sVersion % Test,
+        "com.comcast" %% "ip4s-test-kit" % "3.1.2" % Test,
         "com.eed3si9n.expecty" %% "expecty" % "0.15.4" % Test,
         "software.amazon.awssdk" % "sts" % awsSdkVersion % Test,
         "eu.timepit" %% "refined-scalacheck" % refinedV % Test,

@@ -1,16 +1,18 @@
-package com.dwolla.rabbitmq.policies
+package com.dwolla.rabbitmq
+package policies
 
 import com.dwolla.DwollaEnvironment
+import com.dwolla.rabbitmq.RabbitMqCommonHandler.UriFromHost
 import io.circe.generic.extras.Configuration
-import io.circe.{Codec, JsonObject}
-import io.circe.generic.semiauto.deriveCodec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import io.circe.generic.semiauto.deriveCodec
+import io.circe.{Codec, JsonObject}
 
 case class RabbitMqPolicy(policyName: String,
                           policy: Policy,
-                          host: String, // TODO make this Uri?
+                          host: UriFromHost,
                           environment: DwollaEnvironment,
-                           )
+                         )
 
 object RabbitMqPolicy {
   implicit val RabbitMqPoliciesCodec: Codec[RabbitMqPolicy] = deriveCodec

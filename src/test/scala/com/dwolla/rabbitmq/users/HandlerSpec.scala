@@ -3,8 +3,10 @@ package com.dwolla.rabbitmq.users
 import cats._
 import cats.effect._
 import cats.syntax.all._
+import com.comcast.ip4s.Arbitraries.{hostnameGenerator, idnGenerator, ipGenerator}
 import com.dwolla._
 import com.dwolla.rabbitmq.Arbitraries._
+import com.dwolla.rabbitmq.RabbitMqCommonHandler.UriFromHost
 import com.dwolla.rabbitmq.{Arbitraries, FakeSecretsManagerAlg}
 import com.eed3si9n.expecty.Expecty.expect
 import feral.lambda.cloudformation.PhysicalResourceId
@@ -42,7 +44,7 @@ class HandlerSpec
     for {
       username <- Gen.identifier
       password <- arbitrary[String]
-      host <- Gen.identifier // TODO use generator from http4s?
+      host <- Gen.oneOf(ipGenerator, hostnameGenerator, idnGenerator).flatMap(UriFromHost(_).fold(_ => Gen.fail, Gen.const))
       permissions <- arbitrary[RabbitMqPermissions]
       env <- arbitrary[DwollaEnvironment]
     } yield RabbitMqUser(username, password, permissions, host, env)
@@ -58,7 +60,7 @@ class HandlerSpec
         .handleRequest[IO](client, secretsManager)
         .createResource(input)
         .map { output =>
-          expect(output.physicalId == PhysicalResourceId.unsafeApply(s"https://${input.host}/api/users/${input.username}"))
+          expect(output.physicalId == PhysicalResourceId.unsafeApply((input.host.value / "api" / "users" / input.username).renderString))
         }
     }
   }
@@ -72,7 +74,7 @@ class HandlerSpec
         .handleRequest[IO](client, secretsManager)
         .deleteResource(input)
         .map { output =>
-          expect(output.physicalId == PhysicalResourceId.unsafeApply(s"https://${input.host}/api/users/${input.username}"))
+          expect(output.physicalId == PhysicalResourceId.unsafeApply((input.host.value / "api" / "users" / input.username).renderString))
         }
     }
   }

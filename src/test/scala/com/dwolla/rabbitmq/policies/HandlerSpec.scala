@@ -3,9 +3,11 @@ package com.dwolla.rabbitmq.policies
 import cats._
 import cats.effect._
 import cats.syntax.all._
+import com.comcast.ip4s.Arbitraries._
 import com.dwolla._
-import com.dwolla.rabbitmq.{Arbitraries, FakeSecretsManagerAlg}
 import com.dwolla.rabbitmq.Arbitraries._
+import com.dwolla.rabbitmq.RabbitMqCommonHandler._
+import com.dwolla.rabbitmq.{Arbitraries, FakeSecretsManagerAlg}
 import com.eed3si9n.expecty.Expecty.expect
 import feral.lambda.cloudformation.PhysicalResourceId
 import io.circe.JsonObject
@@ -38,7 +40,7 @@ class HandlerSpec
     for {
       policyName <- Gen.identifier
       policy <- arbitrary[Policy]
-      host <- Gen.identifier // TODO use generator from http4s?
+      host <- Gen.oneOf(ipGenerator, hostnameGenerator, idnGenerator).flatMap(UriFromHost(_).fold(_ => Gen.fail, Gen.const))
       env <- arbitrary[DwollaEnvironment]
     } yield RabbitMqPolicy(policyName, policy, host, env)
   private implicit val arbRabbitMqPolicy: Arbitrary[RabbitMqPolicy] = Arbitrary(genRabbitMqPolicy)
@@ -53,7 +55,7 @@ class HandlerSpec
         .handleRequest[IO](client, secretsManager)
         .createResource(input)
         .map { output =>
-          expect(output.physicalId == PhysicalResourceId.unsafeApply(s"https://${input.host}/api/policies/%2F/${input.policyName}"))
+          expect(output.physicalId == PhysicalResourceId.unsafeApply((input.host.value / "api" / "policies" / "/" / input.policyName).renderString))
         }
     }
   }
@@ -67,7 +69,7 @@ class HandlerSpec
         .handleRequest[IO](client, secretsManager)
         .deleteResource(input)
         .map { output =>
-          expect(output.physicalId == PhysicalResourceId.unsafeApply(s"https://${input.host}/api/policies/%2F/${input.policyName}"))
+          expect(output.physicalId == PhysicalResourceId.unsafeApply((input.host.value / "api" / "policies" / "/" / input.policyName).renderString))
         }
     }
   }
