@@ -7,7 +7,8 @@ import cats.effect.std.Random
 import cats.effect.syntax.all._
 import cats.syntax.all._
 import cats.tagless.syntax.all._
-import com.dwolla.aws.{SecretId, SecretsManagerAlg}
+import com.dwolla.RabbitMqCommonHandler.{baseUri, rabbitAuthorizationHeader}
+import com.dwolla.aws.SecretsManagerAlg
 import com.dwolla.rabbitmq.users.RabbitMqUserResource.handleRequest
 import com.dwolla.tracing._
 import feral.lambda.cloudformation.{CloudFormationCustomResource, CloudFormationCustomResourceRequest, HandlerResponse, PhysicalResourceId}
@@ -18,11 +19,12 @@ import natchez.http4s.NatchezMiddleware
 import natchez.xray.{XRay, XRayEnvironment}
 import org.http4s.Method.{DELETE, PUT}
 import org.http4s.circe.jsonEncoder
+import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
-import org.http4s.client.{Client, middleware}
+import org.http4s.client.middleware.{RequestLogger, ResponseLogger}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
-import org.http4s.{BasicCredentials, Response, Uri}
+import org.http4s.{Response, Uri}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -33,12 +35,6 @@ object RabbitMqUserResource {
                                                                              secretsManagerAlg: SecretsManagerAlg[F])
                                                                             (implicit SC: _root_.fs2.Compiler[F, F]): CloudFormationCustomResource[F, RabbitMqUser, INothing] =
     new CloudFormationCustomResource[F, RabbitMqUser, INothing] with Http4sClientDsl[F] {
-      private def rabbitAuthorizationHeader(env: DwollaEnvironment): F[Authorization] =
-        for {
-          login_username <- secretsManagerAlg.getSecret(SecretId(s"rabbitmq/${env.lowercaseName}/rabbitmq/username"))
-          login_password <- secretsManagerAlg.getSecret(SecretId(s"rabbitmq/${env.lowercaseName}/rabbitmq/password"))
-        } yield Authorization(BasicCredentials(login_username, login_password))
-
       private def putUser(input: RabbitMqUser, userUri: Uri, auth: Authorization): F[PhysicalResourceId] =
         for {
           physicalResourceId <- client.run(PUT(RabbitMqUserDto(input.password, "monitoring").asJson, userUri, auth)).use { res: Response[F] =>
@@ -63,14 +59,10 @@ object RabbitMqUserResource {
           .successful(PUT(input.permissions.asJson, baseUri / "api" / "permissions" / rabbitmqVirtualHost / input.username, auth))
           .ifM(().pure[F], Logger[F].warn(s"the user permissions could not be set for user ${input.username}"))
 
-      // TODO move this to JSON decoder
-      private def baseUri(input: RabbitMqUser): F[Uri] =
-        Uri.fromString(s"https://${input.host}").liftTo[F]
-
       private def createOrUpdate(input: RabbitMqUser): F[HandlerResponse[INothing]] =
         for {
-          baseUri <- baseUri(input)
-          auth <- rabbitAuthorizationHeader(input.environment)
+          baseUri <- baseUri(input.host)
+          auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
           id <- putUser(input, baseUri / "api" / "users" / input.username, auth)
           _ <- putUserPermissions(input, baseUri, auth)
         } yield HandlerResponse(id, None)
@@ -83,8 +75,8 @@ object RabbitMqUserResource {
 
       override def deleteResource(input: RabbitMqUser): F[HandlerResponse[INothing]] =
         for {
-          baseUri <- baseUri(input)
-          auth <- rabbitAuthorizationHeader(input.environment)
+          baseUri <- baseUri(input.host)
+          auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
           id <- deleteUser(input, baseUri / "api" / "users" / input.username, auth)
         } yield HandlerResponse(id, None)
 
@@ -118,7 +110,14 @@ class RabbitMqUserResource[F[_] : Async] {
     EmberClientBuilder
       .default[F]
       .build
-      .map(middleware.Logger[F](logHeaders = true, logBody = true))  // TODO don't log rabbitmq passwords!
+      .map { client =>
+        // only log response bodies from RabbitMQ. the request bodies for user 
+        // creates/updates are sensitive because they contain the user's password
+        
+        ResponseLogger(logHeaders = true, logBody = true)(
+          RequestLogger(logHeaders = true, logBody = false)(client)
+        )
+      }
 
   private def tracedHttpClient(client: Client[F], span: Span[F]): Client[Kleisli[F, Span[F], *]] =
     NatchezMiddleware.client(client.translate(Kleisli.liftK[F, Span[F]])(Kleisli.applyK(span)))

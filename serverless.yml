@@ -11,7 +11,7 @@ provider:
   deploymentBucket:
     name: ${env:BUCKET}
     serverSideEncryption: "AES256"
-  logRetentionInDays: 7
+  logRetentionInDays: 365
   iam:
     deploymentRole: "arn:aws:iam::${env:ACCOUNT}:role/cloudformation/deployer/cloudformation-deployer"
     role:
@@ -42,6 +42,10 @@ functions:
     handler: com.dwolla.rabbitmq.users.Handler
     package:
       artifact: ${env:ARTIFACT_PATH}
+  InitRabbitMqPolicy:
+    handler: com.dwolla.rabbitmq.policies.Handler
+    package:
+      artifact: ${env:ARTIFACT_PATH}
 
 package:
   individually: true
@@ -50,11 +54,17 @@ resources:
   Description: "CloudFormation custom resources for initializing RabbitMQ users and policies"
   Outputs:
     InitRabbitMqUserFunction:
-      Description: Database initialization Lambda Function Service Token
+      Description: RabbitMQ user initialization Lambda Function Service Token
       Value:
         'Fn::GetAtt': [InitRabbitMqUserLambdaFunction, Arn]
       Export:
-        Name: ${self:service}:${opt:stage}:InitMySqlDatabaseArn
+        Name: ${self:service}:${opt:stage}:RabbitMqUserInitArn
+    InitRabbitMqPolicyFunction:
+      Description: RabbitMQ policy initialization Lambda Function Service Token
+      Value:
+        'Fn::GetAtt': [InitRabbitMqPolicyLambdaFunction, Arn]
+      Export:
+        Name: ${self:service}:${opt:stage}:RabbitMqPolicyInitArn
   Resources:
     LambdaSg:
       Type: AWS::EC2::SecurityGroup

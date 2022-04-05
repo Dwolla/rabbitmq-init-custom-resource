@@ -46,6 +46,7 @@ lazy val `rabbitmq-init-custom-resource` = (project in file("."))
         "org.http4s" %% "http4s-ember-client" % http4sVersion,
         "io.circe" %% "circe-parser" % circeVersion,
         "io.circe" %% "circe-generic" % circeVersion,
+        "io.circe" %% "circe-generic-extras" % circeVersion,
         "io.circe" %% "circe-fs2" % "0.14.0",
         "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
         "com.amazonaws" % "aws-lambda-java-log4j2" % "1.5.1" % Runtime,
