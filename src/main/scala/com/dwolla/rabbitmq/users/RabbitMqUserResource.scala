@@ -13,6 +13,7 @@ import com.dwolla.rabbitmq.users.RabbitMqUserResource.handleRequest
 import com.dwolla.tracing._
 import feral.lambda.cloudformation.{CloudFormationCustomResource, CloudFormationCustomResourceRequest, HandlerResponse, PhysicalResourceId}
 import feral.lambda.{INothing, KernelSource, LambdaEnv, TracedHandler}
+import io.circe.optics.JsonPath
 import io.circe.syntax._
 import natchez.Span
 import natchez.http4s.NatchezMiddleware
@@ -41,16 +42,18 @@ object RabbitMqUserResource {
             if (res.status.isSuccess)
               PhysicalResourceId(userUri.renderString)
                 .liftTo[F](UserCreationException(input.username, userUri.renderString))
-            else res.body.through(ByteStreamJsonParser[F].pipe).compile.last.flatMap { maybeJson =>
-              // TODO use optics
-              val reason =
-                maybeJson
-                  .flatMap(_.asObject)
-                  .flatMap(_("reason").flatMap(_.as[String].toOption))
-                  .getOrElse("Unknown reason")
-
-              UserCreationException(input.username, reason).raiseError[F, PhysicalResourceId]
-            }
+            else
+              res
+                .body
+                .through(ByteStreamJsonParser[F].pipe)
+                .compile
+                .last
+                .map {
+                  _
+                    .flatMap(JsonPath.root.reason.as[String].getOption)
+                    .getOrElse("Unknown reason")
+                }
+                .flatMap(UserCreationException(input.username, _).raiseError[F, PhysicalResourceId])
           }
         } yield physicalResourceId
 
