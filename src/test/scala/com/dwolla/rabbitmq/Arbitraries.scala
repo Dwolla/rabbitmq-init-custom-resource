@@ -1,5 +1,7 @@
 package com.dwolla.rabbitmq
 
+import com.comcast.ip4s.Arbitraries._
+import com.comcast.ip4s.Host
 import com.dwolla.rabbitmq.Arbitraries._
 import com.dwolla.{DevInt, DwollaEnvironment, Prod, Sandbox, Uat}
 import monix.newtypes.NewtypeWrapped
@@ -16,6 +18,9 @@ trait Arbitraries {
   val genDwollaEnvironment: Gen[DwollaEnvironment] =
     Gen.oneOf(DevInt, Uat, Prod, Sandbox)
   implicit val arbDwollaEnvironment: Arbitrary[DwollaEnvironment] = Arbitrary(genDwollaEnvironment)
+
+  val genHost: Gen[Host] = Gen.oneOf(ipGenerator, hostnameGenerator) // TODO add idnGenerator
+  implicit val arbHost: Arbitrary[Host] = Arbitrary(genHost)
 }
 
 object Arbitraries {

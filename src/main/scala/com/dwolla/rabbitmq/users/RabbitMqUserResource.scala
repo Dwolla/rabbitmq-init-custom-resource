@@ -2,10 +2,14 @@ package com.dwolla
 package rabbitmq.users
 
 import cats.effect._
+import cats.effect.syntax.all._
 import cats.syntax.all._
 import com.dwolla.aws.SecretsManagerAlg
+import com.dwolla.rabbitmq.AbstractCreateOrUpdateHandler
+import com.dwolla.rabbitmq.AbstractCreateOrUpdateHandler.logEvent
 import com.dwolla.rabbitmq.RabbitMqCommonHandler._
 import feral.lambda.INothing
+import feral.lambda.cloudformation.CloudFormationRequestType._
 import feral.lambda.cloudformation.{CloudFormationCustomResource, HandlerResponse, PhysicalResourceId}
 import io.circe.optics.JsonPath
 import io.circe.syntax._
@@ -21,7 +25,7 @@ object RabbitMqUserResource {
   def handleRequest[F[_] : MonadCancelThrow : ByteStreamJsonParser : Logger](client: Client[F],
                                                                              secretsManagerAlg: SecretsManagerAlg[F])
                                                                             (implicit SC: _root_.fs2.Compiler[F, F]): CloudFormationCustomResource[F, RabbitMqUser, INothing] =
-    new CloudFormationCustomResource[F, RabbitMqUser, INothing] with Http4sClientDsl[F] {
+    new AbstractCreateOrUpdateHandler[F, RabbitMqUser] with Http4sClientDsl[F] {
       private def putUser(input: RabbitMqUser, userUri: Uri, auth: Authorization): F[PhysicalResourceId] =
         for {
           physicalResourceId <- client.run(PUT(RabbitMqUserDto(input.password, "monitoring").asJson, userUri, auth)).use { res: Response[F] =>
@@ -48,24 +52,22 @@ object RabbitMqUserResource {
           .successful(PUT(input.permissions.asJson, baseUri / "api" / "permissions" / rabbitmqVirtualHost / input.username, auth))
           .ifM(().pure[F], Logger[F].warn(s"the user permissions could not be set for user ${input.username}"))
 
-      private def createOrUpdate(input: RabbitMqUser): F[HandlerResponse[INothing]] =
+      override def createOrUpdate(input: RabbitMqUser): F[HandlerResponse[INothing]] =
         for {
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
           id <- putUser(input, input.host.value / "api" / "users" / input.username, auth)
           _ <- putUserPermissions(input, input.host.value, auth)
         } yield HandlerResponse(id, None)
 
-      override def createResource(input: RabbitMqUser): F[HandlerResponse[INothing]] =
-        createOrUpdate(input)
-
-      override def updateResource(input: RabbitMqUser): F[HandlerResponse[INothing]] =
-        createOrUpdate(input)
-
       override def deleteResource(input: RabbitMqUser): F[HandlerResponse[INothing]] =
-        for {
+        (for {
+          _ <- logEvent(input, DeleteRequest, None)
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
           id <- deleteUser(input, input.host.value / "api" / "users" / input.username, auth)
-        } yield HandlerResponse(id, None)
+        } yield HandlerResponse(id, None))
+          .guaranteeCase { outcome =>
+            logEvent(input, DeleteRequest, outcome.some)
+          }
 
       private def deleteUser(input: RabbitMqUser, userUri: Uri, auth: Authorization): F[PhysicalResourceId] =
         client

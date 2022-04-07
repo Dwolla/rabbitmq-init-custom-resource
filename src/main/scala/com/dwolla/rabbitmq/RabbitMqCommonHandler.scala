@@ -7,7 +7,7 @@ import cats.effect.std.Random
 import cats.effect.syntax.all._
 import cats.syntax.all._
 import cats.tagless.syntax.all._
-import com.comcast.ip4s.Host
+import com.comcast.ip4s.{Host, IDN, Ipv6Address}
 import com.dwolla.DwollaEnvironment
 import com.dwolla.aws.{SecretId, SecretsManagerAlg}
 import com.dwolla.tracing._
@@ -18,7 +18,6 @@ import monix.newtypes.NewtypeWrapped
 import natchez.Span
 import natchez.http4s.NatchezMiddleware
 import natchez.xray.{XRay, XRayEnvironment}
-import org.http4s.circe.decodeUri
 import org.http4s.client.Client
 import org.http4s.client.middleware.{RequestLogger, ResponseLogger}
 import org.http4s.ember.client.EmberClientBuilder
@@ -31,21 +30,31 @@ object RabbitMqCommonHandler {
 
   type UriFromHost = UriFromHost.Type
   object UriFromHost extends NewtypeWrapped[Uri] {
-    def apply(host: Host): ParseResult[UriFromHost] =
+    def apply(host: Host): ParseResult[UriFromHost] = {
       Uri
-        .fromString(s"https://${host.show}")
+        .fromString(s"https://${hostUriString(host)}")
         .map(UriFromHost(_))
+    }
 
     implicit val UriFromHostnameDecoder: Decoder[UriFromHost] =
-      Decoder[Uri]
-        .map(UriFromHost(_))
+      Decoder[Host]
+        .emap(UriFromHost(_).leftMap(_.message))
         .or {
-          Decoder[Host]
-            .emap(UriFromHost(_).leftMap(_.message))
+          import org.http4s.circe.decodeUri
+          Decoder[Uri]
+            .map(UriFromHost(_))
         }
 
     implicit val UriFromHostnameEncoder: Encoder[UriFromHost] =
       Encoder[String].contramap(_.value.renderString)
+
+    implicit val UriFromHostnameEq: Eq[UriFromHost] = Eq[Uri].contramap(_.value)
+
+    def hostUriString: Host => String =  {
+      case ipv6: Ipv6Address => ipv6.toUriString
+      case idn: IDN => idn.normalized.show
+      case other => other.show
+    }
   }
 
   def rabbitAuthorizationHeader[F[_] : Monad](secretsManagerAlg: SecretsManagerAlg[F])
@@ -69,7 +78,7 @@ class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span
       secretsManager <- secretsManagerResource
     } yield { implicit env: LambdaEnv[F, CloudFormationCustomResourceRequest[T]] =>
       TracedHandler(entryPoint, Kleisli { (span: Span[F]) =>
-        CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing](tracedHttpClient(client, span), f(tracedHttpClient(client, span), secretsManager)).run(span)
+        CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing](tracedHttpClient(logEverythingHttpClient(client), span), f(tracedHttpClient(sensitiveRequestBodyHttpClient(client), span), secretsManager)).run(span)
       })
     }
 
@@ -77,14 +86,20 @@ class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span
     EmberClientBuilder
       .default[F]
       .build
-      .map { client =>
-        // only log response bodies from RabbitMQ. the request bodies for user
-        // creates/updates are sensitive because they contain the user's password
 
-        ResponseLogger(logHeaders = true, logBody = true)(
-          RequestLogger(logHeaders = true, logBody = logRequestBodies)(client)
-        )
-      }
+  /**
+   * only log response bodies from RabbitMQ. the request bodies for user
+   * creates/updates are sensitive because they contain the user's password
+   */
+  private def sensitiveRequestBodyHttpClient(client: Client[F]): Client[F] =
+    ResponseLogger(logHeaders = true, logBody = true)(
+      RequestLogger(logHeaders = true, logBody = logRequestBodies)(client)
+    )
+
+  private def logEverythingHttpClient(client: Client[F]): Client[F] =
+    ResponseLogger(logHeaders = true, logBody = true)(
+      RequestLogger(logHeaders = true, logBody = true)(client)
+    )
 
   private def tracedHttpClient(client: Client[F], span: Span[F]): Client[Kleisli[F, Span[F], *]] =
     NatchezMiddleware.client(client.translate(Kleisli.liftK[F, Span[F]])(Kleisli.applyK(span)))

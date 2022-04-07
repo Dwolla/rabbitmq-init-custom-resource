@@ -21,11 +21,15 @@ import org.http4s.{HttpApp, HttpRoutes}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.effect.PropF
 import org.scalacheck.{Arbitrary, Gen}
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.noop.NoOpLogger
 
 class HandlerSpec
   extends CatsEffectSuite
     with ScalaCheckEffectSuite 
     with Arbitraries {
+
+  private implicit def logger[F[_] : Applicative]: Logger[F] = NoOpLogger[F]
 
   private val genPolicy: Gen[Policy] =
     for {
