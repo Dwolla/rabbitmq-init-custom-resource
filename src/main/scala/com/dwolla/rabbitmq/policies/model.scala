@@ -6,7 +6,7 @@ import com.dwolla.rabbitmq.RabbitMqCommonHandler.UriFromHost
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import io.circe.generic.semiauto.deriveCodec
-import io.circe.{Codec, JsonObject}
+import io.circe.{Codec}
 
 case class RabbitMqPolicy(policyName: String,
                           policy: Policy,
@@ -19,10 +19,18 @@ object RabbitMqPolicy {
 }
 
 case class Policy(pattern: String,
-                  definition: JsonObject, // TODO should this be more narrowly defined?
+                  definition: PolicyDefinition,
                   priority: Option[Int],
                   applyTo: Option[String],
                  )
+
+case class PolicyDefinition(`ha-mode`: String,
+                            `ha-plan`: Int,
+                            `message-ttl`: Option[Int])
+
+object PolicyDefinition {
+  implicit val PolicyDefinitionCodec: Codec[PolicyDefinition] = deriveCodec
+}
 
 object Policy {
   implicit val config: Configuration = Configuration.default.withKebabCaseMemberNames

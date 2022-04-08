@@ -10,9 +10,7 @@ import com.dwolla.rabbitmq.RabbitMqCommonHandler._
 import com.dwolla.rabbitmq.{Arbitraries, FakeSecretsManagerAlg}
 import com.eed3si9n.expecty.Expecty.expect
 import feral.lambda.cloudformation.PhysicalResourceId
-import io.circe.JsonObject
 import io.circe.literal.JsonStringContext
-import io.circe.testing.instances.arbitraryJsonObject
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 import org.http4s.circe.jsonEncoder
 import org.http4s.client._
@@ -31,10 +29,21 @@ class HandlerSpec
 
   private implicit def logger[F[_] : Applicative]: Logger[F] = NoOpLogger[F]
 
+  private val genPolicyDefinition: Gen[PolicyDefinition] = {
+
+    for {
+      `ha-mode` <- arbitrary[String]
+      `ha-plan` <- arbitrary[Int]
+      `message-ttl` <- arbitrary[Option[Int]]
+    } yield PolicyDefinition(`ha-mode`, `ha-plan`, `message-ttl`)
+  }
+  private implicit val arbPolicyDefinition: Arbitrary[PolicyDefinition] = Arbitrary(genPolicyDefinition)
+
+
   private val genPolicy: Gen[Policy] =
     for {
       pattern <- arbitrary[String]
-      definition <- arbitrary[JsonObject]
+      definition <- arbitrary[PolicyDefinition]
       priority <- arbitrary[Option[Int]]
       applyTo <- arbitrary[Option[String]]
     } yield Policy(pattern, definition, priority, applyTo)
