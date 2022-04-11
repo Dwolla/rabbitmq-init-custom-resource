@@ -33,9 +33,9 @@ class HandlerSpec
 
     for {
       `ha-mode` <- arbitrary[String]
-      `ha-plan` <- arbitrary[Int]
+      `ha-params` <- arbitrary[Int]
       `message-ttl` <- arbitrary[Option[Int]]
-    } yield PolicyDefinition(`ha-mode`, `ha-plan`, `message-ttl`)
+    } yield PolicyDefinition(`ha-mode`, `ha-params`, `message-ttl`)
   }
   private implicit val arbPolicyDefinition: Arbitrary[PolicyDefinition] = Arbitrary(genPolicyDefinition)
 

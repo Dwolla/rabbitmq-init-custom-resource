@@ -25,7 +25,7 @@ case class Policy(pattern: String,
                  )
 
 case class PolicyDefinition(`ha-mode`: String,
-                            `ha-plan`: Int,
+                            `ha-params`: Int,
                             `message-ttl`: Option[Int])
 
 object PolicyDefinition {

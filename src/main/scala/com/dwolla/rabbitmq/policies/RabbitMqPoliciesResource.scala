@@ -35,7 +35,7 @@ object RabbitMqPoliciesResource {
                            ): F[PhysicalResourceId] =
         for {
           physicalId <- PhysicalResourceId(policyUri.renderString).liftTo[F](PolicyCreationException(policyName, policyUri))
-          out <- client.successful(PUT(policy.asJson, policyUri, auth))
+          out <- client.successful(PUT(policy.asJson.deepDropNullValues, policyUri, auth))
             .ifM(physicalId.pure[F], PolicyCreationException(policyName, policyUri).raiseError)
         } yield out
 
