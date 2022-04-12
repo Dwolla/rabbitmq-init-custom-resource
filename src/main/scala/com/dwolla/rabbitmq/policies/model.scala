@@ -24,12 +24,14 @@ case class Policy(pattern: String,
                   applyTo: Option[String],
                  )
 
-case class PolicyDefinition(`ha-mode`: String,
-                            `ha-params`: Int,
-                            `message-ttl`: Option[Int])
+case class PolicyDefinition(haMode: String,
+                            haParams: Int,
+                            messageTtl: Option[Int])
 
 object PolicyDefinition {
-  implicit val PolicyDefinitionCodec: Codec[PolicyDefinition] = deriveCodec
+  @scala.annotation.nowarn("msg=private val config in object PolicyDefinition is never used")
+  private implicit val config: Configuration = Configuration.default.withKebabCaseMemberNames
+  implicit val PolicyDefinitionCodec: Codec[PolicyDefinition] = deriveConfiguredCodec
 }
 
 object Policy {

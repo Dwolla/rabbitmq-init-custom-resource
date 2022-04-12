@@ -1,5 +1,6 @@
 package com.dwolla.rabbitmq
 
+import com.dwolla.rabbitmq.policies.PolicyDefinition
 import com.comcast.ip4s.Arbitraries._
 import com.comcast.ip4s.Host
 import com.dwolla.rabbitmq.Arbitraries._
@@ -21,6 +22,14 @@ trait Arbitraries {
 
   val genHost: Gen[Host] = Gen.oneOf(ipGenerator, hostnameGenerator) // TODO add idnGenerator
   implicit val arbHost: Arbitrary[Host] = Arbitrary(genHost)
+
+  val genPolicyDefinition: Gen[PolicyDefinition] =
+    for {
+      haMode <- arbitrary[String]
+      haParams <- arbitrary[Int]
+      messageTtl <- arbitrary[Option[Int]]
+    } yield PolicyDefinition(haMode, haParams, messageTtl)
+  implicit val arbPolicyDefinition: Arbitrary[PolicyDefinition] = Arbitrary(genPolicyDefinition)
 }
 
 object Arbitraries {

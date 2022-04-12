@@ -29,17 +29,6 @@ class HandlerSpec
 
   private implicit def logger[F[_] : Applicative]: Logger[F] = NoOpLogger[F]
 
-  private val genPolicyDefinition: Gen[PolicyDefinition] = {
-
-    for {
-      `ha-mode` <- arbitrary[String]
-      `ha-params` <- arbitrary[Int]
-      `message-ttl` <- arbitrary[Option[Int]]
-    } yield PolicyDefinition(`ha-mode`, `ha-params`, `message-ttl`)
-  }
-  private implicit val arbPolicyDefinition: Arbitrary[PolicyDefinition] = Arbitrary(genPolicyDefinition)
-
-
   private val genPolicy: Gen[Policy] =
     for {
       pattern <- arbitrary[String]
