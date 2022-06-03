@@ -25,7 +25,8 @@ case class Policy(pattern: String,
                  )
 
 case class PolicyDefinition(haMode: String,
-                            haParams: Int,
+                            haParams: Option[Int],
+                            haSyncMode: String,
                             messageTtl: Option[Int])
 
 object PolicyDefinition {

@@ -26,9 +26,10 @@ trait Arbitraries {
   val genPolicyDefinition: Gen[PolicyDefinition] =
     for {
       haMode <- arbitrary[String]
-      haParams <- arbitrary[Int]
+      haParams <- arbitrary[Option[Int]]
+      haSyncMode <- arbitrary[String]
       messageTtl <- arbitrary[Option[Int]]
-    } yield PolicyDefinition(haMode, haParams, messageTtl)
+    } yield PolicyDefinition(haMode, haParams, haSyncMode, messageTtl)
   implicit val arbPolicyDefinition: Arbitrary[PolicyDefinition] = Arbitrary(genPolicyDefinition)
 }
 

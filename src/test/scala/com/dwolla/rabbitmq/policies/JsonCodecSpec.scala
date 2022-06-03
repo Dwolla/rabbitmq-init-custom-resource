@@ -21,6 +21,7 @@ class JsonCodecSpec
                   "definition": {
                     "ha-mode": ${definitionObj.haMode},
                     "ha-params": ${definitionObj.haParams},
+                    "ha-sync-mode": ${definitionObj.haSyncMode},
                     "message-ttl": ${definitionObj.messageTtl}
                   },
                   "priority": $priority,
