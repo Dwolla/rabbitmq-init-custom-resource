@@ -2,7 +2,7 @@ ThisBuild / organization := "com.dwolla"
 ThisBuild / description := "CloudFormation custom resources for initializing RabbitMQ users and policies"
 ThisBuild / homepage := Some(url("https://github.com/Dwolla/rabbitmq-init-custom-resource"))
 ThisBuild / licenses += ("MIT", url("https://opensource.org/licenses/MIT"))
-ThisBuild / scalaVersion := "2.13.8"
+ThisBuild / scalaVersion := "2.13.9"
 ThisBuild / developers := List(
   Developer(
     "bpholt",
