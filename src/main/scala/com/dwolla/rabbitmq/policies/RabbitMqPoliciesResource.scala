@@ -19,10 +19,9 @@ import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.headers.Authorization
 import org.typelevel.log4cats.Logger
 
-case class PolicyCreationException(policyName: String, 
-                                   policyUri: Uri) extends RuntimeException(s"Could not create or update $policyName at ${policyUri.renderString}")
+case class PolicyCreationException(policyName: String) extends RuntimeException(s"Could not create or update policy $policyName")
 
-case class PolicyRemovalException(policyUri: Uri) extends RuntimeException(s"Could not remove policy at ${policyUri.renderString}")
+case class PolicyRemovalException(policyName: String) extends RuntimeException(s"Could not remove policy $policyName")
 
 object RabbitMqPoliciesResource {
   def handleRequest[F[_] : MonadCancelThrow : Logger](client: Client[F],
@@ -34,9 +33,9 @@ object RabbitMqPoliciesResource {
                             auth: Authorization,
                            ): F[PhysicalResourceId] =
         for {
-          physicalId <- PhysicalResourceId(policyUri.renderString).liftTo[F](PolicyCreationException(policyName, policyUri))
+          physicalId <- PhysicalResourceId(policyUri.renderString).liftTo[F](PolicyCreationException(policyName))
           out <- client.successful(PUT(policy.asJson.deepDropNullValues, policyUri, auth))
-            .ifM(physicalId.pure[F], PolicyCreationException(policyName, policyUri).raiseError)
+            .ifM(physicalId.pure[F], PolicyCreationException(policyName).raiseError)
         } yield out
 
       private def policyUri(baseUri: Uri, policyName: String): Uri =
@@ -53,8 +52,8 @@ object RabbitMqPoliciesResource {
           _ <- logEvent(input, DeleteRequest, None)
           auth <- rabbitAuthorizationHeader(secretsManagerAlg)(input.environment)
           uri = policyUri(input.host.value, input.policyName)
-          physicalId <- PhysicalResourceId(uri.renderString).liftTo[F](PolicyRemovalException(uri))
-          _ <- client.successful(DELETE(uri, auth)).ifM(().pure[F], PolicyRemovalException(uri).raiseError)
+          physicalId <- PhysicalResourceId(uri.renderString).liftTo[F](PolicyRemovalException(input.policyName))
+          _ <- client.successful(DELETE(uri, auth)).ifM(().pure[F], PolicyRemovalException(input.policyName).raiseError)
         } yield HandlerResponse(physicalId, None))
           .guaranteeCase { outcome =>
             logEvent(input, DeleteRequest, outcome.some)
