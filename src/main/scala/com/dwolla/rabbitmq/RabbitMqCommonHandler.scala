@@ -16,7 +16,6 @@ import feral.lambda.{INothing, KernelSource, LambdaEnv, TracedHandler}
 import io.circe._
 import monix.newtypes.NewtypeWrapped
 import natchez.Span
-import natchez.http4s.NatchezMiddleware
 import natchez.xray.{XRay, XRayEnvironment}
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
@@ -68,7 +67,7 @@ object RabbitMqCommonHandler {
    * building the client so tests can apply it to an in-memory client.
    */
   private[rabbitmq] def decorate[F[_] : MonadCancelThrow](client: Client[F], span: Span[F]): Client[Kleisli[F, Span[F], *]] =
-    NatchezMiddleware.client(client.translate(Kleisli.liftK[F, Span[F]])(Kleisli.applyK(span)))
+    traceRequests(client.translate(Kleisli.liftK[F, Span[F]])(Kleisli.applyK(span)))
 }
 
 class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span[F], *]], SecretsManagerAlg[Kleisli[F, Span[F], *]]) => CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing]) {
