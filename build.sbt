@@ -62,6 +62,7 @@ lazy val `rabbitmq-init-custom-resource` = (project in file("."))
         "org.typelevel" %% "scalacheck-effect" % scalacheckEffectVersion % Test,
         "org.typelevel" %% "scalacheck-effect-munit" % scalacheckEffectVersion % Test,
         "org.typelevel" %% "log4cats-noop" % log4catsVersion % Test,
+        "org.typelevel" %% "log4cats-testing" % log4catsVersion % Test,
         "io.circe" %% "circe-testing" % circeVersion % Test,
         "com.github.julien-truffaut" %% "monocle-core" % monocleVersion % Test,
         "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion % Test,

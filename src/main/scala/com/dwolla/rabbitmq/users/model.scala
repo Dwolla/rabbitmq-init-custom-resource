@@ -3,8 +3,10 @@ package users
 
 import com.dwolla.DwollaEnvironment
 import com.dwolla.rabbitmq.RabbitMqCommonHandler.UriFromHost
-import io.circe.Codec
+import cats.Show
 import io.circe.generic.semiauto.deriveCodec
+import io.circe.syntax._
+import io.circe.{Codec, Json}
 
 case object MissingLoginUsername extends RuntimeException("Could not find RabbitMQ login username in environment")
 case object MissingLoginPassword extends RuntimeException("Could not find RabbitMQ login password in environment")
@@ -36,4 +38,16 @@ object RabbitMqPermissions {
 
 object RabbitMqUser {
   implicit val RabbitMqUserCodec: Codec[RabbitMqUser] = deriveCodec
+
+  /**
+   * Renders the user as JSON with every field except the password.
+   */
+  implicit val RabbitMqUserShow: Show[RabbitMqUser] = Show.show { user =>
+    Json.obj(
+      "username" -> user.username.asJson,
+      "permissions" -> user.permissions.asJson,
+      "host" -> user.host.asJson,
+      "environment" -> user.environment.asJson,
+    ).noSpaces
+  }
 }

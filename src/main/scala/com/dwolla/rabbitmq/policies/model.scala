@@ -1,11 +1,13 @@
 package com.dwolla.rabbitmq
 package policies
 
+import cats.Show
 import com.dwolla.DwollaEnvironment
 import com.dwolla.rabbitmq.RabbitMqCommonHandler.UriFromHost
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import io.circe.generic.semiauto.deriveCodec
+import io.circe.syntax._
 import io.circe.{Codec}
 
 case class RabbitMqPolicy(policyName: String,
@@ -16,6 +18,11 @@ case class RabbitMqPolicy(policyName: String,
 
 object RabbitMqPolicy {
   implicit val RabbitMqPoliciesCodec: Codec[RabbitMqPolicy] = deriveCodec
+
+  /**
+   * Renders the policy as JSON, every field included.
+   */
+  implicit val RabbitMqPolicyShow: Show[RabbitMqPolicy] = Show.show(_.asJson.noSpaces)
 }
 
 case class Policy(pattern: String,
