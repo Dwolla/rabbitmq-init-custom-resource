@@ -10,6 +10,6 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 class Handler extends IOLambda[CloudFormationCustomResourceRequest[RabbitMqPolicy], INothing] {
   override def handler: Resource[IO, LambdaEnv[IO, CloudFormationCustomResourceRequest[RabbitMqPolicy]] => IO[Option[INothing]]] =
     Slf4jLogger.create[IO].toResource.flatMap { implicit l =>
-      new RabbitMqCommonHandler[IO, RabbitMqPolicy](RabbitMqPoliciesResource.handleRequest, logRequestBodies = true).handler
+      new RabbitMqCommonHandler[IO, RabbitMqPolicy](RabbitMqPoliciesResource.handleRequest).handler
     }
 }
