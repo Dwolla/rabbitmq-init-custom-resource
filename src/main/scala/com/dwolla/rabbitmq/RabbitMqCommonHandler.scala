@@ -16,10 +16,8 @@ import feral.lambda.{INothing, KernelSource, LambdaEnv, TracedHandler}
 import io.circe._
 import monix.newtypes.NewtypeWrapped
 import natchez.Span
-import natchez.http4s.NatchezMiddleware
 import natchez.xray.{XRay, XRayEnvironment}
 import org.http4s.client.Client
-import org.http4s.client.middleware.{RequestLogger, ResponseLogger}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
 import org.http4s.{BasicCredentials, ParseResult, Uri}
@@ -63,10 +61,16 @@ object RabbitMqCommonHandler {
       login_username <- secretsManagerAlg.getSecret(SecretId(s"rabbitmq/${env.lowercaseName}/rabbitmq/username"))
       login_password <- secretsManagerAlg.getSecret(SecretId(s"rabbitmq/${env.lowercaseName}/rabbitmq/password"))
     } yield Authorization(BasicCredentials(login_username, login_password))
+
+  /**
+   * The middleware the Lambda's HTTP client runs through for one invocation, kept apart from
+   * building the client so tests can apply it to an in-memory client.
+   */
+  private[rabbitmq] def decorate[F[_] : MonadCancelThrow](client: Client[F], span: Span[F]): Client[Kleisli[F, Span[F], *]] =
+    traceRequests(client.translate(Kleisli.liftK[F, Span[F]])(Kleisli.applyK(span)))
 }
 
-class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span[F], *]], SecretsManagerAlg[Kleisli[F, Span[F], *]]) => CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing],
-                                                      logRequestBodies: Boolean) {
+class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span[F], *]], SecretsManagerAlg[Kleisli[F, Span[F], *]]) => CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing]) {
   def handler: Resource[F, LambdaEnv[F, CloudFormationCustomResourceRequest[T]] => F[Option[INothing]]] =
     for {
       implicit0(random: Random[F]) <- Random.scalaUtilRandom[F].toResource
@@ -78,7 +82,7 @@ class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span
       secretsManager <- secretsManagerResource
     } yield { implicit env: LambdaEnv[F, CloudFormationCustomResourceRequest[T]] =>
       TracedHandler(entryPoint, Kleisli { (span: Span[F]) =>
-        CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing](tracedHttpClient(logEverythingHttpClient(client), span), f(tracedHttpClient(sensitiveRequestBodyHttpClient(client), span), secretsManager)).run(span)
+        CloudFormationCustomResource[Kleisli[F, Span[F], *], T, INothing](RabbitMqCommonHandler.decorate(client, span), f(RabbitMqCommonHandler.decorate(client, span), secretsManager)).run(span)
       })
     }
 
@@ -86,23 +90,6 @@ class RabbitMqCommonHandler[F[_] : Async : Logger, T](f: (Client[Kleisli[F, Span
     EmberClientBuilder
       .default[F]
       .build
-
-  /**
-   * only log response bodies from RabbitMQ. the request bodies for user
-   * creates/updates are sensitive because they contain the user's password
-   */
-  private def sensitiveRequestBodyHttpClient(client: Client[F]): Client[F] =
-    ResponseLogger(logHeaders = true, logBody = true)(
-      RequestLogger(logHeaders = true, logBody = logRequestBodies)(client)
-    )
-
-  private def logEverythingHttpClient(client: Client[F]): Client[F] =
-    ResponseLogger(logHeaders = true, logBody = true)(
-      RequestLogger(logHeaders = true, logBody = true)(client)
-    )
-
-  private def tracedHttpClient(client: Client[F], span: Span[F]): Client[Kleisli[F, Span[F], *]] =
-    NatchezMiddleware.client(client.translate(Kleisli.liftK[F, Span[F]])(Kleisli.applyK(span)))
 
   protected def secretsManagerResource: Resource[F, SecretsManagerAlg[Kleisli[F, Span[F], *]]] =
     SecretsManagerAlg.resource[F].map(_.mapK(Kleisli.liftK[F, Span[F]]).withTracing)

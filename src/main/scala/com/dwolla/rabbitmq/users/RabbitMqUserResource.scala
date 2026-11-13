@@ -31,17 +31,17 @@ object RabbitMqUserResource {
           physicalResourceId <- client.run(PUT(RabbitMqUserDto(input.password, "monitoring").asJson, userUri, auth)).use { res: Response[F] =>
             if (res.status.isSuccess)
               PhysicalResourceId(userUri.renderString)
-                .liftTo[F](UserCreationException(input.username, userUri.renderString))
+                .liftTo[F](UserCreationException(input.username, "its URI is not a valid physical resource ID"))
             else
               res
                 .body
                 .through(ByteStreamJsonParser[F].pipe)
                 .compile
                 .last
-                .map {
-                  _
-                    .flatMap(JsonPath.root.reason.as[String].getOption)
-                    .getOrElse("Unknown reason")
+                .map(_.flatMap(JsonPath.root.error.as[String].getOption))
+                .handleError(_ => None)
+                .map { error =>
+                  s"RabbitMQ responded ${res.status.code}${error.foldMap(" " + _)}"
                 }
                 .flatMap(UserCreationException(input.username, _).raiseError[F, PhysicalResourceId])
           }
